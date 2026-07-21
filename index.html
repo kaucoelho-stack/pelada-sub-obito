@@ -339,7 +339,7 @@ const posInfo = (key) => POSITIONS.find(p=>p.key===key) || POSITIONS[3];
 
 // Placeholder com emoji — troque .icon pelos seus ícones (pode virar <img src="..."> depois)
 // Atualiza esse número a cada leva de mudanças publicada (aparece no rodapé do app)
-const APP_VERSION = '2.1';
+const APP_VERSION = '2.3';
 
 const STAT_TYPES = [
   {key:'goals',    icon:'⚽', label:'Gol'},
@@ -358,7 +358,7 @@ let state = {
   tab: 'avaliar',
   search: '',
   teamSize: 6,
-  rankingSort: 'ovr',
+  rankingSort: 'goals',
   eventsExpanded: false,
 };
 
@@ -727,7 +727,7 @@ function attachHeaderEvents(){
 
 function renderPlayerFicha(p, isPending){
   const info = posInfo(p.position);
-  const {avg, count, hasVotes} = playerAvg(p.id);
+  const {count} = playerAvg(p.id);
   const myVote = (state.votes[p.id] || {})[state.voter.id];
   const myStars = myVote ? myVote.stars : 0;
   let stars = '';
@@ -750,7 +750,7 @@ function renderPlayerFicha(p, isPending){
             <div class="pos-tag">${p.position}</div>
           </div>
         </div>
-        <div class="stats">${hasVotes ? avg.toFixed(1)+' ★' : 'sem notas'}<br>${count} aval.</div>
+        <div class="stats">${count} aval.</div>
       </div>
       <div class="stars">${stars}</div>
       ${myVote ? `<div class="your-note">Sua nota: <b>${myVote.stars} ★</b> — toque na estrela para mudar</div>` : `<div class="your-note">Toque na metade esquerda p/ meia nota, direita p/ nota cheia</div>`}
@@ -835,7 +835,6 @@ function renderNightsHistory(){
 }
 
 const RANK_COLS = [
-  {key:'ovr', label:'OVR'},
   {key:'goals', label:'G'},
   {key:'assists', label:'A'},
   {key:'ownGoals', label:'GC'},
@@ -844,24 +843,19 @@ const RANK_COLS = [
 
 function renderTabRanking(){
   if(!state.players.length) return `<div class="empty"><b>Nada para mostrar</b>Cadastre jogadores primeiro.</div>`;
-  const sortKey = state.rankingSort || 'ovr';
+  const sortKey = state.rankingSort || 'goals';
   const rows = state.players.map(p=>{
-    const {avg,hasVotes} = playerAvg(p.id);
     return {
       ...p,
-      ovr: hasVotes ? avg : 0,
-      hasVotes,
       goals: getStat(p.id,'goals'),
       assists: getStat(p.id,'assists'),
       ownGoals: getStat(p.id,'ownGoals'),
       fights: getStat(p.id,'fights'),
     };
   }).sort((a,b)=>{
-    if(sortKey === 'ovr'){
-      if(a.hasVotes !== b.hasVotes) return a.hasVotes ? -1 : 1;
-      return b.ovr - a.ovr;
-    }
-    return b[sortKey] - a[sortKey];
+    // Empate (inclusive quando está tudo zerado) cai pra ordem alfabética,
+    // pra ninguém ficar por último por parecer "pior".
+    return (b[sortKey] - a[sortKey]) || a.name.localeCompare(b.name, 'pt-BR');
   });
 
   let html = `<div class="section-title">Ranking do elenco</div>`;
@@ -880,7 +874,6 @@ function renderTabRanking(){
     html += `<tr>
       <td>${i+1}</td>
       <td class="name-cell"><span style="color:${info.color}; font-size:9.5px; font-weight:800; margin-right:5px;">${info.short}</span>${r.name}</td>
-      <td class="${sortKey==='ovr'?'active-col':''}">${r.hasVotes ? r.ovr.toFixed(1) : '–'}</td>
       <td class="${sortKey==='goals'?'active-col':''}">${r.goals}</td>
       <td class="${sortKey==='assists'?'active-col':''}">${r.assists}</td>
       <td class="${sortKey==='ownGoals'?'active-col':''}">${r.ownGoals}</td>
@@ -888,6 +881,7 @@ function renderTabRanking(){
     </tr>`;
   });
   html += `</tbody></table></div>`;
+  html += `<div class="draw-meta">As notas de avaliação entram, em segredo, só no cálculo do sorteio dos times — não aparecem em nenhum ranking.</div>`;
   return html;
 }
 
@@ -1044,7 +1038,6 @@ function renderTabSorteio(){
           <span class="t-name">${t.name}${isOpenTeam ? ' (em aberto)' : ''}</span>
           <span class="t-score">${scores[i]}</span>
         </div>
-        <div class="team-sub">${t.players.length ? 'força média: '+(t.sum/t.players.length).toFixed(1)+' ★' : ''}</div>
         <div class="team-players">`;
       t.players.forEach(p=>{
         const info = posInfo(p.position);
@@ -1055,7 +1048,6 @@ function renderTabSorteio(){
         html += `<div class="team-player">
           <div class="tp-top">
             <span><span class="tp-pos" style="color:${info.color}">${info.short}</span>${p.name}</span>
-            <span class="tp-avg">${p.avg.toFixed(1)} ★</span>
           </div>
           <div class="tp-stats">${statsRow}</div>
         </div>`;
